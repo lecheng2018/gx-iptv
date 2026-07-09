@@ -1,0 +1,45 @@
+name: 同步广西移动IPv6直播源
+
+on:
+  schedule:
+    # 每6小时执行一次
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    # 支持手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 执行转换脚本
+        run: python3 scripts/convert.py
+
+      - name: 检查是否有更新
+        id: check
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ 无更新，跳过提交"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 提交并推送变更
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gxyd_ipv6.m3u
+          git commit -m "chore: 同步上游直播源更新 $(date +'%Y-%m-%d %H:%M')"
+          git push
